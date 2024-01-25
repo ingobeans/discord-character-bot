@@ -2,10 +2,6 @@ import discord, json, os, model
 from discord.ext import commands
 from dataclasses import dataclass
 
-intents = discord.Intents.default()
-intents.message_content = True
-client = commands.Bot(command_prefix='!', intents=intents)
-
 if not os.path.isfile("settings.json"):
     if input(f"There is no settings.json in {os.getcwd()}. Do you want to create it? (y/n): ").lower() != "y":
         quit()
@@ -13,6 +9,7 @@ if not os.path.isfile("settings.json"):
         "bot_token":None,
         "pawankrd_key":None,
         "conversation_channel_name":None,
+        "command_prefix":"!",
         "presets":
             {
                 "default":{"content":"Conversation between an AI assistant and user.\n\n","username":"User","botname":"Assistant"}
@@ -28,9 +25,14 @@ with open("settings.json","r",encoding="utf-8") as f:
     PAWAN_KRD_TOKEN = SETTINGS["pawankrd_key"]
     CONVERSATION_CHANNEL_NAME = SETTINGS["conversation_channel_name"]
     PRESETS = SETTINGS["presets"]
+    COMMAND_PREFIX = SETTINGS["command_prefix"]
     if BOT_TOKEN == None or PAWAN_KRD_TOKEN == None:
         print("Discord bot token or pawan.krd (https://discord.gg/pawan) key is missing from settings.json. Please add the missing settings.")
         quit()
+
+intents = discord.Intents.default()
+intents.message_content = True
+client = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 @dataclass
 class Conversation:
@@ -56,7 +58,7 @@ async def on_ready():
 async def preset(ctx,presetname="default"):
     global conversations
     if not presetname in PRESETS:
-        await ctx.reply(f"Preset {presetname} doesn't exist. Use !list to list available presets.",mention_author=False)
+        await ctx.reply(f"Preset {presetname} doesn't exist. Use {COMMAND_PREFIX}list to list available presets.",mention_author=False)
         return
     
     new_preset = PRESETS[presetname]
@@ -78,7 +80,7 @@ async def on_message(message):
     global conversations
     if (message.channel.name != CONVERSATION_CHANNEL_NAME and CONVERSATION_CHANNEL_NAME != None) or message.author.bot:
         return
-    if message.content.startswith("!"):
+    if message.content.startswith(COMMAND_PREFIX):
         await client.process_commands(message)
         return
 
