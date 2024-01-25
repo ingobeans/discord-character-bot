@@ -1,4 +1,4 @@
-import discord, json, os, model, asyncio, gpt
+import discord, json, os, model, asyncio, gpt, requests
 from discord.ext import commands
 from dataclasses import dataclass
 from translate import Translator
@@ -50,6 +50,7 @@ class Conversation:
     use_gpt:bool
     translate:Translator
     translate_english:Translator
+    avatar_url:str
     messages:str=""
 
 @dataclass
@@ -58,6 +59,7 @@ class ChannelSettings:
     PRESETS:dict
     ALLOWED_COMMANDS:list
     CHANNEL_NAME:str
+    WEBHOOK:str
 
 def remove_partial_suffix(text:str, suffix:str)->str:
     for i in range(1, len(suffix) + 1):
@@ -68,7 +70,7 @@ def remove_partial_suffix(text:str, suffix:str)->str:
 
 def get_settings(channel_name:str)->ChannelSettings:
     settings_dict = GLOBAL_SETTINGS[channel_name]
-    return ChannelSettings(settings_dict["global"],settings_dict["presets"],settings_dict["allowed_commands"],channel_name)
+    return ChannelSettings(settings_dict["global"],settings_dict["presets"],settings_dict["allowed_commands"],channel_name,settings_dict["webhook"] if "webhook" in settings_dict else None)
 
 def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if settings.GLOBAL:
@@ -79,7 +81,8 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
         gpt = "use_gpt" in c and c["use_gpt"] == True
         translate = Translator(to_lang=c["translate"]) if "translate" in c else None
         translate_english = Translator(to_lang="en",from_lang=c["translate"]) if "translate" in c else None
-        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt,translate,translate_english)
+        avatar_url = c["avatar_url"] if "avatar_url" in c else None
+        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt,translate,translate_english,avatar_url)
     
     return conversations[settings.CHANNEL_NAME][username]
 
@@ -99,7 +102,23 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
         print(f"Translating response...")
         resp = conversation.translate.translate(resp)
     
+    if settings.WEBHOOK != None:
+        send_webhook_message(resp,settings,conversation)
+        return
+    
     await message.reply(resp,mention_author=False)
+
+def send_webhook_message(message:str,settings:ChannelSettings,conversation:Conversation):
+    data = {"content": message, "username": conversation.botname}
+    if conversation.avatar_url != None:
+        data = {
+                    "avatar_url": conversation.avatar_url,
+                    "content": message, 
+                    "username": conversation.botname
+                }
+    requests.post(settings.WEBHOOK,data)
+    
+        
 
 conversations = {}
 
@@ -133,6 +152,7 @@ async def preset_command(ctx,presetname=None):
     conversation.use_gpt = "use_gpt" in new_preset and new_preset["use_gpt"] == True
     conversation.translate = Translator(to_lang=new_preset["translate"]) if "translate" in new_preset else None
     conversation.translate_english = Translator(to_lang="en",from_lang=new_preset["translate"]) if "translate" in new_preset else None
+    conversation.avatar_url = new_preset["avatar_url"] if "avatar_url" in new_preset else None
 
     await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
