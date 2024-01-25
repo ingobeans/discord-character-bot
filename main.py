@@ -1,6 +1,7 @@
-import discord, json, os, model
+import discord, json, os, model, asyncio
 from discord.ext import commands
 from dataclasses import dataclass
+from threading import Thread
 
 if not os.path.isfile("settings.json"):
     if input(f"There is no settings.json in {os.getcwd()}. Do you want to create it? (y/n): ").lower() != "y":
@@ -60,6 +61,15 @@ def get_conversation(username:str)->Conversation:
     
     return conversations[username]
 
+async def generate_response(text:str,message,conversation:Conversation):
+    resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
+    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+    conversation.messages+=f"{resp}\n\n"
+
+    print(f"{message.author.name} -> {repr(resp)}")
+
+    await message.reply(resp,mention_author=False)
+
 conversations = {}
 
 @client.event
@@ -109,13 +119,7 @@ async def on_message(message):
     conversation = get_conversation(author)
 
     conversation.messages+=f"{conversation.username.format(username=author)}: {message.content}\n\n{conversation.botname}: "
-
-    resp = model.complete(conversation.start_text+conversation.messages,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
-    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(username=author)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
-    conversation.messages+=f"{resp}\n\n"
-
-    print(f"{author} -> {repr(resp)}")
-
-    await message.reply(resp,mention_author=False)
+    
+    asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation))
 
 client.run(BOT_TOKEN)
