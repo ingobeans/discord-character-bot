@@ -13,6 +13,7 @@ if not os.path.isfile("settings.json"):
         "enter channel name here (you can have multiple channels as seperate keys, all with the following format)":
         {
             "global":False,
+            "allowed_commands":["preset","list","get","debug","clear"],
             "presets":
                 {
                     "assistant":
@@ -52,6 +53,7 @@ class Conversation:
 class ChannelSettings:
     GLOBAL:bool
     PRESETS:dict
+    ALLOWED_COMMANDS:list
     CHANNEL_NAME:str
 
 def remove_partial_suffix(text:str, suffix:str)->str:
@@ -63,7 +65,7 @@ def remove_partial_suffix(text:str, suffix:str)->str:
 
 def get_settings(channel_name:str)->ChannelSettings:
     settings_dict = GLOBAL_SETTINGS[channel_name]
-    return ChannelSettings(settings_dict["global"],settings_dict["presets"],channel_name)
+    return ChannelSettings(settings_dict["global"],settings_dict["presets"],settings_dict["allowed_commands"],channel_name)
 
 def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if settings.GLOBAL:
@@ -97,6 +99,8 @@ async def on_ready():
 async def preset_command(ctx,presetname=None):
     global conversations
     settings = get_settings(ctx.channel.name)
+    if not "preset" in settings.ALLOWED_COMMANDS:
+        return
     if presetname == None:
         presetname = list(settings.PRESETS.keys())[0]
     if not presetname in settings.PRESETS:
@@ -112,21 +116,30 @@ async def preset_command(ctx,presetname=None):
 @client.command(name="list")
 async def list_command(ctx):
     settings = get_settings(ctx.channel.name)
+    if not "list" in settings.ALLOWED_COMMANDS:
+        return
     await ctx.reply("## Available presets:"+"".join(["\n\n* " + p for p in settings.PRESETS]),mention_author=False)
 
 @client.command(name="clear")
 async def clear_command(ctx):
     settings = get_settings(ctx.channel.name)
+    if not "clear" in settings.ALLOWED_COMMANDS:
+        return
     get_conversation(ctx.author.name,settings).messages = ""
     await ctx.reply("Cleared conversation!",mention_author=False)
 
 @client.command(name="debug")
 async def debug_command(ctx):
+    settings = get_settings(ctx.channel.name)
+    if not "debug" in settings.ALLOWED_COMMANDS:
+        return
     await ctx.reply(f"```json\n{str(conversations)}```",mention_author=False)
 
 @client.command(name="get")
 async def get_command(ctx):
     settings = get_settings(ctx.channel.name)
+    if not "get" in settings.ALLOWED_COMMANDS:
+        return
     conversation = get_conversation(ctx.author.name,settings)
     await ctx.send(f"{conversation.start_text}{conversation.messages}")
 
