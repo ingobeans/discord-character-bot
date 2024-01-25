@@ -1,4 +1,4 @@
-import discord, json, os, model, asyncio
+import discord, json, os, model, asyncio, gpt
 from discord.ext import commands
 from dataclasses import dataclass
 from threading import Thread
@@ -47,6 +47,7 @@ class Conversation:
     start_text:str
     username:str
     botname:str
+    use_gpt:bool
     messages:str=""
 
 @dataclass
@@ -71,25 +72,31 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if settings.GLOBAL:
         username="global"
     
-    if not settings.CHANNEL_NAME in conversations:
-        conversations[settings.CHANNEL_NAME] = {}
-    
     if not username in conversations[settings.CHANNEL_NAME]:
         c = settings.PRESETS[list(settings.PRESETS.keys())[0]]
-        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"])
+        gpt = "use_gpt" in c and c["use_gpt"] == True
+        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt)
     
     return conversations[settings.CHANNEL_NAME][username]
 
-async def generate_response(text:str,message,conversation:Conversation):
-    resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
+async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings):
+    if conversation.use_gpt:
+        resp = gpt.complete(text,stop=["\n\n"])
+        print(f"used chat gpt to complete {text}")
+    else:
+        resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
     resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=message.author.display_name,username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
     conversation.messages+=f"{resp}\n\n"
 
     print(f"{message.author.name} -> {repr(resp)}")
-
+    #gpt
     await message.reply(resp,mention_author=False)
 
 conversations = {}
+
+for channel in [k for k in list(GLOBAL_SETTINGS.keys()) if not k in ["bot_token","pawankrd_key","command_prefix"]]:
+    conversations[channel] = {}
+
 
 @client.event
 async def on_ready():
@@ -109,8 +116,13 @@ async def preset_command(ctx,presetname=None):
     
     new_preset = settings.PRESETS[presetname]
     
-    conversations[settings.CHANNEL_NAME][ctx.author.name] = Conversation(new_preset["content"],new_preset["username"].format(username=ctx.author.name),new_preset["botname"])
-    
+    conversation = get_conversation(ctx.author.name,settings)
+    conversation.start_text = new_preset["content"]
+    conversation.username = new_preset["username"]
+    conversation.botname = new_preset["botname"]
+    conversation.messages = ""
+    conversation.use_gpt = "use_gpt" in new_preset and new_preset["use_gpt"] == True
+
     await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
 @client.command(name="list")
@@ -160,6 +172,6 @@ async def on_message(message):
     username = conversation.username.format(name=message.author.display_name,username=message.author.name)
     conversation.messages+=f"{username}: {message.content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {message.content}\n\n"
     
-    asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation))
+    asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation,settings))
 
 client.run(BOT_TOKEN)
