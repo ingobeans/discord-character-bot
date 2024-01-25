@@ -34,9 +34,10 @@ with open("settings.json","r",encoding="utf-8") as f:
 
 @dataclass
 class Conversation:
-    messages:str
+    start_text:str
     username:str
     botname:str
+    messages:str=""
 
 def remove_partial_suffix(text:str, suffix:str)->str:
     for i in range(1, len(suffix) + 1):
@@ -75,7 +76,7 @@ async def get(ctx):
 @client.event
 async def on_message(message):
     global conversations
-    if message.channel.name != CONVERSATION_CHANNEL_NAME or message.author.bot:
+    if (message.channel.name != CONVERSATION_CHANNEL_NAME and CONVERSATION_CHANNEL_NAME != None) or message.author.bot:
         return
     if message.content.startswith("!"):
         await client.process_commands(message)
@@ -88,9 +89,9 @@ async def on_message(message):
 
     conversations[author].messages+=f"{conversations[author].username}: {message.content}\n\n{conversations[author].botname}: "
 
-    resp = model.complete(conversations[author].messages,PAWAN_KRD_TOKEN,stop=[f"\n\n{conversations[author].username}"],max_tokens=128)
-    resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}") # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
-    conversations[author].messages+=f"{resp}\n"
+    resp = model.complete(conversations[author].start_text+conversations[author].messages,PAWAN_KRD_TOKEN,stop=[f"\n\n{conversations[author].username}"],max_tokens=128)
+    resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+    conversations[author].messages+=f"{resp}\n\n"
 
     print(f"{author} -> {repr(resp)}")
 

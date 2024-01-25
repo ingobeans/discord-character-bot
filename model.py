@@ -16,4 +16,8 @@ def complete(text:str,key:str,temperature:float=0.7,max_tokens:int=256,stop:list
 
     response = requests.post('https://api.pawan.krd/v1/completions', headers=headers, json=json_data)
 
-    return response.json()["choices"][0]["text"]
+    try:
+        return response.json()["choices"][0]["text"]
+    except Exception as e:
+        print(str(e))
+        print(response.text)
