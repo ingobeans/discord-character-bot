@@ -1,6 +1,6 @@
 import requests
 
-def complete(text:str,key:str,temperature:float=0.7,max_tokens:int=256,stop:list[str]=[],model:str='pai-001-light')->str:
+def complete(text:str,key:str,temperature:float=0.7,max_tokens:int=256,stop:list[str]=[],model:str='pai-001')->str:
     headers = {
         'Authorization': key,
         'Content-Type': 'application/json',
