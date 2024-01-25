@@ -1,4 +1,4 @@
-import discord, random, json, os
+import discord, json, os, model
 from discord.ext import commands
 from dataclasses import dataclass
 
@@ -15,7 +15,7 @@ if not os.path.isfile("settings.json"):
         "conversation_channel_name":None,
         "presets":
             {
-                "default":{"content":"Conversation between an AI assistant and user.","username":"User","botname":"Assistant"}
+                "default":{"content":"Conversation between an AI assistant and user.\n\n","username":"User","botname":"Assistant"}
             }
     }
     with open("settings.json","w") as f:
@@ -37,6 +37,13 @@ class Conversation:
     messages:str
     username:str
     botname:str
+
+def remove_partial_suffix(text:str, suffix:str)->str:
+    for i in range(1, len(suffix) + 1):
+        partial_suffix = suffix[:i]
+        if text.endswith(partial_suffix):
+            return text[:-len(partial_suffix)]
+    return text
 
 conversations = {}
 
@@ -66,9 +73,19 @@ async def on_message(message):
 
     if not author in conversations:
         conversations[author] = Conversation(PRESETS["default"]["content"],PRESETS["default"]["username"],PRESETS["default"]["botname"])
+
+    conversations[author].messages+=f"{conversations[author].username}: {message.content}\n\n{conversations[author].botname}: "
+
+    print(f"Before: {conversations[author].messages}")
+
+    resp = model.complete(conversations[author].messages,PAWAN_KRD_TOKEN,stop=[f"\n\n{conversations[author].username}"],max_tokens=128)
+    resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}") # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+    conversations[author].messages+=f"{resp}\n\n"
+
     
-    conversation:Conversation = conversations[author]
-    await message.channel.send(f"{message.author.name}, you are chatting as {conversation.username}")
+    print(f"After: {conversations[author].messages}")
+
+    await message.channel.send(resp)
     
     await client.process_commands(message)
 
