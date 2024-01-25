@@ -58,10 +58,15 @@ async def preset(ctx,presetname):
 
 @client.event
 async def on_message(message):
-    if message.channel.name != CONVERSATION_CHANNEL_NAME:
+    global conversations
+    if message.channel.name != CONVERSATION_CHANNEL_NAME or message.author.bot:
         return
     
     author = message.author.name
+
+    if not author in conversations:
+        conversations[author] = Conversation(PRESETS["default"]["content"],PRESETS["default"]["username"],PRESETS["default"]["botname"])
+    
     conversation:Conversation = conversations[author]
     await message.channel.send(f"{message.author.name}, you are chatting as {conversation.username}")
     
