@@ -10,9 +10,10 @@ if not os.path.isfile("settings.json"):
         "pawankrd_key":None,
         "conversation_channel_name":None,
         "command_prefix":"!",
+        "global":False,
         "presets":
             {
-                "default":{"content":"Conversation between an AI assistant and user.\n\n","username":"User","botname":"Assistant"}
+                "assistant":{"content":"Conversation between an AI assistant and user.\n\n","username":"User","botname":"Assistant"}
             }
     }
     with open("settings.json","w") as f:
@@ -25,6 +26,7 @@ with open("settings.json","r",encoding="utf-8") as f:
     PAWAN_KRD_TOKEN = SETTINGS["pawankrd_key"]
     CONVERSATION_CHANNEL_NAME = SETTINGS["conversation_channel_name"]
     PRESETS = SETTINGS["presets"]
+    GLOBAL = SETTINGS["global"]
     COMMAND_PREFIX = SETTINGS["command_prefix"]
     if BOT_TOKEN == None or PAWAN_KRD_TOKEN == None:
         print("Discord bot token or pawan.krd (https://discord.gg/pawan) key is missing from settings.json. Please add the missing settings.")
@@ -48,32 +50,50 @@ def remove_partial_suffix(text:str, suffix:str)->str:
             return text[:-len(partial_suffix)]
     return text
 
+def get_conversation(username:str)->Conversation:
+    if GLOBAL:
+        username="global"
+    
+    if not username in conversations:
+        c = PRESETS[list(PRESETS.keys())[0]]
+        conversations[username] = Conversation(c["content"],c["username"],c["botname"])
+    
+    return conversations[username]
+
 conversations = {}
 
 @client.event
 async def on_ready():
     print("Bot is online!")
 
-@client.command()
-async def preset(ctx,presetname="default"):
+@client.command(name="preset")
+async def preset_command(ctx,presetname=None):
     global conversations
+    if presetname == None:
+        presetname = list(PRESETS.keys())[0]
     if not presetname in PRESETS:
         await ctx.reply(f"Preset {presetname} doesn't exist. Use {COMMAND_PREFIX}list to list available presets.",mention_author=False)
         return
     
     new_preset = PRESETS[presetname]
     
-    conversations[ctx.author.name] = Conversation(new_preset["content"],new_preset["username"],new_preset["botname"])
+    conversations[ctx.author.name] = Conversation(new_preset["content"],new_preset["username"].format(username=ctx.author.name),new_preset["botname"])
     
     await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
-@client.command()
-async def list(ctx):
+@client.command(name="list")
+async def list_command(ctx):
     await ctx.reply("## Available presets:"+"".join(["\n\n* " + p for p in PRESETS]),mention_author=False)
 
-@client.command()
-async def get(ctx):
-    await ctx.send(conversations[ctx.author.name].messages)
+@client.command(name="clear")
+async def clear_command(ctx):
+    get_conversation(ctx.author.name).messages = ""
+    await ctx.reply("Cleared conversation!",mention_author=False)
+
+@client.command(name="get")
+async def get_command(ctx):
+    conversation = get_conversation(ctx.author.name)
+    await ctx.send(f"{conversation.start_text}{conversation.messages}")
 
 @client.event
 async def on_message(message):
@@ -85,15 +105,14 @@ async def on_message(message):
         return
 
     author = message.author.name
+    
+    conversation = get_conversation(author)
 
-    if not author in conversations:
-        conversations[author] = Conversation(PRESETS["default"]["content"],PRESETS["default"]["username"],PRESETS["default"]["botname"])
+    conversation.messages+=f"{conversation.username.format(username=author)}: {message.content}\n\n{conversation.botname}: "
 
-    conversations[author].messages+=f"{conversations[author].username}: {message.content}\n\n{conversations[author].botname}: "
-
-    resp = model.complete(conversations[author].start_text+conversations[author].messages,PAWAN_KRD_TOKEN,stop=[f"\n\n{conversations[author].username}"],max_tokens=128)
-    resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
-    conversations[author].messages+=f"{resp}\n\n"
+    resp = model.complete(conversation.start_text+conversation.messages,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
+    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(username=author)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+    conversation.messages+=f"{resp}\n\n"
 
     print(f"{author} -> {repr(resp)}")
 
