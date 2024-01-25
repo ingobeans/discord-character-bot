@@ -1,7 +1,7 @@
 import discord, json, os, model, asyncio, gpt
 from discord.ext import commands
 from dataclasses import dataclass
-from threading import Thread
+from translate import Translator
 
 if not os.path.isfile("settings.json"):
     if input(f"There is no settings.json in {os.getcwd()}. Do you want to create it? (y/n): ").lower() != "y":
@@ -48,6 +48,8 @@ class Conversation:
     username:str
     botname:str
     use_gpt:bool
+    translate:Translator
+    translate_english:Translator
     messages:str=""
 
 @dataclass
@@ -75,7 +77,9 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if not username in conversations[settings.CHANNEL_NAME]:
         c = settings.PRESETS[list(settings.PRESETS.keys())[0]]
         gpt = "use_gpt" in c and c["use_gpt"] == True
-        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt)
+        translate = Translator(to_lang=c["translate"]) if "translate" in c else None
+        translate_english = Translator(to_lang="en",from_lang=c["translate"]) if "translate" in c else None
+        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt,translate,translate_english)
     
     return conversations[settings.CHANNEL_NAME][username]
 
@@ -86,10 +90,15 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
     else:
         resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
     resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=message.author.display_name,username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+
     conversation.messages+=f"{resp}\n\n"
 
     print(f"{message.author.name} -> {repr(resp)}")
-    #gpt
+
+    if conversation.translate != None:
+        print(f"Translating response...")
+        resp = conversation.translate.translate(resp)
+    
     await message.reply(resp,mention_author=False)
 
 conversations = {}
@@ -122,6 +131,8 @@ async def preset_command(ctx,presetname=None):
     conversation.botname = new_preset["botname"]
     conversation.messages = ""
     conversation.use_gpt = "use_gpt" in new_preset and new_preset["use_gpt"] == True
+    conversation.translate = Translator(to_lang=new_preset["translate"]) if "translate" in new_preset else None
+    conversation.translate_english = Translator(to_lang="en",from_lang=new_preset["translate"]) if "translate" in new_preset else None
 
     await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
@@ -166,11 +177,16 @@ async def on_message(message):
         return
 
     author = message.author.name
+    content = message.content
     
     conversation = get_conversation(author,settings)
+    
+    if conversation.translate_english != None:
+        content = conversation.translate_english.translate(content)
+        print(f"Translated: {content}")
 
     username = conversation.username.format(name=message.author.display_name,username=message.author.name)
-    conversation.messages+=f"{username}: {message.content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {message.content}\n\n"
+    conversation.messages+=f"{username}: {content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {content}\n\n"
     
     asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation,settings))
 
