@@ -22,7 +22,7 @@ if not os.path.isfile("settings.json"):
         json.dump(default_settings,f,indent=2)
     
 
-with open("settings.json","r") as f:
+with open("settings.json","r",encoding="utf-8") as f:
     SETTINGS = json.load(f)
     BOT_TOKEN = SETTINGS["bot_token"]
     PAWAN_KRD_TOKEN = SETTINGS["pawankrd_key"]
@@ -55,17 +55,18 @@ async def on_ready():
 async def preset(ctx,presetname="default"):
     global conversations
     if not presetname in PRESETS:
+        await ctx.reply(f"Preset {presetname} doesn't exist. Use !list to list available presets.",mention_author=False)
         return
     
     new_preset = PRESETS[presetname]
     
     conversations[ctx.author.name] = Conversation(new_preset["content"],new_preset["username"],new_preset["botname"])
     
-    await ctx.send(f"Loaded preset {presetname}, for {ctx.author.name}")
+    await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
 @client.command()
 async def list(ctx):
-    await ctx.reply("Available presets: \n\n"+"".join(["\n\n* " + p for p in PRESETS]),mention_author=False)
+    await ctx.reply("## Available presets:"+"".join(["\n\n* " + p for p in PRESETS]),mention_author=False)
 
 @client.command()
 async def get(ctx):
@@ -91,9 +92,8 @@ async def on_message(message):
     resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}") # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
     conversations[author].messages+=f"{resp}\n"
 
-    os.system("cls")
-    print(repr(resp))
+    print(f"{author} -> {repr(resp)}")
 
-    await message.channel.send(resp)
+    await message.reply(resp,mention_author=False)
 
 client.run(BOT_TOKEN)
