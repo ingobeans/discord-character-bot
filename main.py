@@ -13,7 +13,7 @@ if not os.path.isfile("settings.json"):
     "enter channel name here (you can have multiple channels as seperate keys, all with the following format)":
     {
         "global":false,
-        "allowed_commands":["preset","list","get","debug","clear"],
+        "allowed_commands":["preset","list","get","debug","clear","username"],
         
         "DISABLED.webhook": "remove 'DISABLED.' to use a webhook url here. A webhook isn't required, but allows your presets to have custom avatars and usernames.",
 
@@ -77,6 +77,11 @@ def get_settings(channel_name:str)->ChannelSettings:
     settings_dict = GLOBAL_SETTINGS[channel_name]
     return ChannelSettings(settings_dict["global"],settings_dict["presets"],settings_dict["allowed_commands"],channel_name,settings_dict["webhook"] if "webhook" in settings_dict else None)
 
+def get_name(name:str)->str:
+    if name in name_overrides:
+        return name_overrides[name]
+    return name
+
 def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if settings.GLOBAL:
         username="global"
@@ -97,7 +102,7 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
         print(f"used chat gpt to complete {text}")
     else:
         resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
-    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=message.author.display_name,username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
 
     conversation.messages+=f"{resp}\n\n"
 
@@ -114,18 +119,26 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
     await message.reply(resp,mention_author=False)
 
 def send_webhook_message(message:str,settings:ChannelSettings,conversation:Conversation):
-    data = {"content": message, "username": conversation.botname}
+    botname = conversation.botname
+    if not botname:
+        if len(message.split(": ",1)) == 2:
+            botname = message.split(": ",1)[0]
+            message = message.split(": ",1)[1]
+        else:
+            botname = "System"
+    data = {"content": message, "username": botname}
     if conversation.avatar_url != None:
         data = {
                     "avatar_url": conversation.avatar_url,
                     "content": message, 
-                    "username": conversation.botname
+                    "username": botname
                 }
     requests.post(settings.WEBHOOK,data)
     
         
 
 conversations = {}
+name_overrides = {}
 
 for channel in [k for k in list(GLOBAL_SETTINGS.keys()) if not k in ["bot_token","pawankrd_key","command_prefix"]]:
     conversations[channel] = {}
@@ -133,6 +146,7 @@ for channel in [k for k in list(GLOBAL_SETTINGS.keys()) if not k in ["bot_token"
 
 @client.event
 async def on_ready():
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="the documents pile up."))
     print("Bot is online!")
 
 @client.command(name="preset")
@@ -189,7 +203,21 @@ async def get_command(ctx):
     if not "get" in settings.ALLOWED_COMMANDS:
         return
     conversation = get_conversation(ctx.author.name,settings)
-    await ctx.send(f"{conversation.start_text}{conversation.messages}")
+    await ctx.reply(f"{conversation.start_text}{conversation.messages}",mention_author=False)
+
+@client.command(name="username")
+async def username_command(ctx, *, username=None):
+    global name_overrides
+    settings = get_settings(ctx.channel.name)
+    if not "username" in settings.ALLOWED_COMMANDS:
+        return
+    
+    if username == None:
+        username = ctx.author.display_name
+    
+    name_overrides[ctx.author.display_name] = username
+
+    await ctx.reply(f"Set username to {username}",mention_author=False)
 
 @client.event
 async def on_message(message):
@@ -210,7 +238,7 @@ async def on_message(message):
         content = conversation.translate_english.translate(content)
         print(f"Translated: {content}")
 
-    username = conversation.username.format(name=message.author.display_name,username=message.author.name)
+    username = conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)
     conversation.messages+=f"{username}: {content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {content}\n\n"
     
     asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation,settings))
