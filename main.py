@@ -6,27 +6,32 @@ from translate import Translator
 if not os.path.isfile("settings.json"):
     if input(f"There is no settings.json in {os.getcwd()}. Do you want to create it? (y/n): ").lower() != "y":
         quit()
-    default_settings = {
-        "bot_token":"enter bot token here",
-        "pawankrd_key":"enter pawan.krd key here",
-        "command_prefix":"!",
-        "enter channel name here (you can have multiple channels as seperate keys, all with the following format)":
-        {
-            "global":False,
-            "allowed_commands":["preset","list","get","debug","clear"],
-            "presets":
+    default_settings = '''{
+    "bot_token":"enter bot token here",
+    "pawankrd_key":"enter pawan.krd key here",
+    "command_prefix":"!",
+    "enter channel name here (you can have multiple channels as seperate keys, all with the following format)":
+    {
+        "global":false,
+        "allowed_commands":["preset","list","get","debug","clear"],
+        
+        "DISABLED.webhook": "remove 'DISABLED.' to use a webhook url here. A webhook isn't required, but allows your presets to have custom avatars and usernames.",
+
+        "presets":
+            {
+                "assistant":
                 {
-                    "assistant":
-                    {
-                        "content":"Conversation between an AI assistant and user.\n\n",
-                        "username":"User",
-                        "botname":"Assistant"
-                    }
+                    "content":"Conversation between an AI assistant and user.\\n\\n",
+                    "username":"User",
+                    "botname":"Assistant",
+
+                    "DISABLED.avatar_url": "remove 'DISABLED.' to use an image URL for the avatar to use with this preset. Only available with a webhook. Enter avatar URL in this field"
                 }
-        }
+            }
     }
+}'''
     with open("settings.json","w") as f:
-        json.dump(default_settings,f,indent=2)
+        f.write(default_settings)
     
 
 with open("settings.json","r",encoding="utf-8") as f:
