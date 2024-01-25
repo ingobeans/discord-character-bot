@@ -21,3 +21,5 @@ def complete(text:str,key:str,temperature:float=0.7,max_tokens:int=256,stop:list
     except Exception as e:
         print(str(e))
         print(response.text)
+        with open("wa.txt","w") as f:
+            f.write(str(e))
