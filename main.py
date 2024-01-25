@@ -52,7 +52,7 @@ async def on_ready():
     print("Bot is online!")
 
 @client.command()
-async def preset(ctx,presetname):
+async def preset(ctx,presetname="default"):
     global conversations
     if not presetname in PRESETS:
         return
@@ -63,12 +63,23 @@ async def preset(ctx,presetname):
     
     await ctx.send(f"Loaded preset {presetname}, for {ctx.author.name}")
 
+@client.command()
+async def list(ctx):
+    await ctx.reply("Available presets: \n\n"+"".join(["\n\n* " + p for p in PRESETS]),mention_author=False)
+
+@client.command()
+async def get(ctx):
+    await ctx.send(conversations[ctx.author.name].messages)
+
 @client.event
 async def on_message(message):
     global conversations
     if message.channel.name != CONVERSATION_CHANNEL_NAME or message.author.bot:
         return
-    
+    if message.content.startswith("!"):
+        await client.process_commands(message)
+        return
+
     author = message.author.name
 
     if not author in conversations:
@@ -76,17 +87,13 @@ async def on_message(message):
 
     conversations[author].messages+=f"{conversations[author].username}: {message.content}\n\n{conversations[author].botname}: "
 
-    print(f"Before: {conversations[author].messages}")
-
     resp = model.complete(conversations[author].messages,PAWAN_KRD_TOKEN,stop=[f"\n\n{conversations[author].username}"],max_tokens=128)
     resp = remove_partial_suffix(resp,f"\n\n{conversations[author].username}") # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
-    conversations[author].messages+=f"{resp}\n\n"
+    conversations[author].messages+=f"{resp}\n"
 
-    
-    print(f"After: {conversations[author].messages}")
+    os.system("cls")
+    print(repr(resp))
 
     await message.channel.send(resp)
-    
-    await client.process_commands(message)
 
 client.run(BOT_TOKEN)
