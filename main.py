@@ -222,12 +222,13 @@ async def username_command(ctx, *, username=None):
 @client.event
 async def on_message(message):
     global conversations
-    settings = get_settings(message.channel.name)
     if not message.channel.name in GLOBAL_SETTINGS or message.author.bot:
         return
     if message.content.startswith(COMMAND_PREFIX):
         await client.process_commands(message)
         return
+    
+    settings = get_settings(message.channel.name)
 
     author = message.author.name
     content = message.content
