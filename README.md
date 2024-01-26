@@ -52,7 +52,7 @@ Here is an example settings.json
             {
                 "assistant":
                 {
-                    "content":"Conversation between an AI assistant and user.\\n\\n",
+                    "content":"Conversation between an AI assistant and user.\n\n",
                     "username":"User",
                     "botname":"Assistant",
                 }
@@ -67,7 +67,7 @@ Here is an example settings.json
             {
                 "assistant":
                 {
-                    "content":"Conversation between an AI assistant and user.\\n\\n",
+                    "content":"Conversation between an AI assistant and user.\n\n",
                     "username":"User",
                     "botname":"Assistant",
                     "avatar_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/800px-ChatGPT_logo.svg.png"
@@ -82,7 +82,7 @@ Here is an example settings.json
             {
                 "assistant":
                 {
-                    "content":"Conversation between an AI assistant multiple users.\\n\\n",
+                    "content":"Conversation between an AI assistant multiple users.\n\n",
                     "username":"{name}",
                     "botname":"Assistant"
                 }
