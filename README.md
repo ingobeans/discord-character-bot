@@ -54,7 +54,7 @@ Here is an example settings.json
                 {
                     "content":"Conversation between an AI assistant and user.\n\n",
                     "username":"User",
-                    "botname":"Assistant",
+                    "botname":"Assistant"
                 }
             }
     },
