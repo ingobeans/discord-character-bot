@@ -39,7 +39,7 @@ Presets are objects containing the keys:
 * "botname" - String, the name that the bot writes from.
 * (optional) "avatar_url" - String, url to the custom avatar to use for the preset. **Only available if the channel has a webhook.**
 * (optional) "temperature" - Float, temperature for the LLM to use, between 0 and 1. Higher means more random responses. Default is 0.7
-* (optional) "use_gpt" - Boolean, whether to complete responses with GPT-3.5 rather than the PAI-001 model. Default is False
+* (optional) "use_gpt" - Boolean, whether to complete responses with GPT-3.5 rather than the PAI-001 model. Default is False. Do note that the gpt api has but a fraction of the context window that the PAI-001 model has.
 
 Here is an example settings.json
 ```json

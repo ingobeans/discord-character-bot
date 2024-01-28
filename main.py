@@ -67,6 +67,7 @@ class Conversation:
     avatar_url:str
     temperature:float=0.7
     messages:str=""
+    generating:bool=False
 
 @dataclass
 class ChannelSettings:
@@ -135,6 +136,7 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
         print(f"Translating response...")
         resp = conversation.translate.translate(resp)
     
+    conversation.generating = False
     if settings.WEBHOOK != None:
         send_webhook_message(resp,settings,conversation)
         return
@@ -257,7 +259,12 @@ async def on_message(message):
     content = message.content
     
     conversation = get_conversation(author,settings)
-    
+
+    print(conversation.generating)
+    if conversation.generating:
+        await message.reply("Already generating a message, please wait for it to finish before sending new message.",mention_author=False)
+        return
+
     if conversation.translate_english != None:
         content = conversation.translate_english.translate(content)
         print(f"Translated: {content}")
@@ -265,6 +272,7 @@ async def on_message(message):
     username = conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)
     conversation.messages+=f"{username}: {content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {content}\n\n"
     
+    conversation.generating = True
     asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation,settings))
 
 client.run(BOT_TOKEN)
