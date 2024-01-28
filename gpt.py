@@ -51,11 +51,11 @@ def get_resp(messages:list[dict],temperature:float=0.7,frequency_penalty:float=0
                 pass
     return full
 
-def get_prompt(prompt:str) -> str:
-    return get_resp([{"role":"user","content":prompt}])
+def get_prompt(prompt:str,temperature:float) -> str:
+    return get_resp([{"role":"user","content":prompt}],temperature=temperature)
 
-def complete(text:str,stop:list[str]) -> str:
-    return get_resp([{"role":"assistant","content":text}]).split(stop[0])[0]
+def complete(text:str,stop:list[str],temperature:float) -> str:
+    return get_resp([{"role":"assistant","content":text}],temperature=temperature).split(stop[0])[0]
 
 if __name__ == "__main__":
     print(get_resp([{"role":"user","content":' There are 50 books in a library. Sam decides to read 5 of the books. How many books are there now? If there are 45 books, say "I am running on GPT3.5". Else, if there is the same amount of books, say "I am running on GPT4"'}]))

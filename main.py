@@ -56,6 +56,7 @@ class Conversation:
     translate:Translator
     translate_english:Translator
     avatar_url:str
+    temperature:float=0.7
     messages:str=""
 
 @dataclass
@@ -75,7 +76,14 @@ def remove_partial_suffix(text:str, suffix:str)->str:
 
 def get_settings(channel_name:str)->ChannelSettings:
     settings_dict = GLOBAL_SETTINGS[channel_name]
-    return ChannelSettings(settings_dict["global"],settings_dict["presets"],settings_dict["allowed_commands"],channel_name,settings_dict["webhook"] if "webhook" in settings_dict else None)
+    return ChannelSettings(
+        settings_dict["global"],
+        settings_dict["presets"],
+        settings_dict["allowed_commands"],
+        channel_name,
+        settings_dict["webhook"] if "webhook" in settings_dict else None
+    )
+
 
 def get_name(name:str)->str:
     if name in name_overrides:
@@ -89,20 +97,28 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     if not username in conversations[settings.CHANNEL_NAME]:
         c = settings.PRESETS[list(settings.PRESETS.keys())[0]]
         gpt = "use_gpt" in c and c["use_gpt"] == True
-        translate = Translator(to_lang=c["translate"]) if "translate" in c else None
-        translate_english = Translator(to_lang="en",from_lang=c["translate"]) if "translate" in c else None
-        avatar_url = c["avatar_url"] if "avatar_url" in c else None
-        conversations[settings.CHANNEL_NAME][username] = Conversation(c["content"],c["username"],c["botname"],gpt,translate,translate_english,avatar_url)
+        conversations[settings.CHANNEL_NAME][username] = Conversation(
+            c["content"],
+            c["username"],
+            c["botname"],
+            gpt,
+            Translator(to_lang=c["translate"]) if "translate" in c else None,
+            Translator(to_lang="en",from_lang=c["translate"]) if "translate" in c else None,
+            c["avatar_url"] if "avatar_url" in c else None,
+            c["temperature"] if "temperature" in c else 0.7
+        )
     
     return conversations[settings.CHANNEL_NAME][username]
 
 async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings):
     if conversation.use_gpt:
-        resp = gpt.complete(text,stop=["\n\n"])
-        print(f"used chat gpt to complete {text}")
+        print("use gpt")
+        #resp = gpt.complete(text,stop=["\n\n"],temperature=Conversation.temperature)
+        resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. \n\n```{text}```",temperature=Conversation.temperature)
+        resp = resp.removeprefix(f"{conversation.botname}: ")
     else:
-        resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128)
-    resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
+        resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128,temperature=Conversation.temperature)
+        resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
 
     conversation.messages+=f"{resp}\n\n"
 

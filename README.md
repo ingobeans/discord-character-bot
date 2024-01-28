@@ -37,6 +37,8 @@ Presets are objects containing the keys:
 * "username" - String, the username that the user has in the eyes of the bot. If you write {user} in the field it will be replaced by the users display name (or custom name set with the !username command). Including {user} is almost a must have if the channel is set to global, since otherwise all users will appear as the same person to the LLM.
 * "botname" - String, the name that the bot writes from.
 * (optional) "avatar_url" - String, url to the custom avatar to use for the preset. **Only available if the channel has a webhook.**
+* (optional) "temperature" - Float, temperature for the LLM to use, between 0 and 1. Higher means more random responses. Default is 0.7
+* (optional) "use_gpt" - Boolean, whether to complete responses with GPT-3.5 rather than the PAI-001 model. Default is False
 
 Here is an example settings.json
 ```json
