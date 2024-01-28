@@ -33,15 +33,24 @@ if not os.path.isfile("settings.json"):
     with open("settings.json","w") as f:
         f.write(default_settings)
     
+def load_global_settings():
+    global GLOBAL_SETTINGS, BOT_TOKEN, PAWAN_KRD_TOKEN, COMMAND_PREFIX, conversations, name_overrides
+    with open("settings.json","r",encoding="utf-8") as f:
+        GLOBAL_SETTINGS = json.load(f)
+        BOT_TOKEN = GLOBAL_SETTINGS["bot_token"]
+        PAWAN_KRD_TOKEN = GLOBAL_SETTINGS["pawankrd_key"]
+        COMMAND_PREFIX = GLOBAL_SETTINGS["command_prefix"]
+        if BOT_TOKEN == None or PAWAN_KRD_TOKEN == None:
+            print("Discord bot token or pawan.krd (https://discord.gg/pawan) key is missing from settings.json. Please add the missing settings.")
+            quit()
 
-with open("settings.json","r",encoding="utf-8") as f:
-    GLOBAL_SETTINGS = json.load(f)
-    BOT_TOKEN = GLOBAL_SETTINGS["bot_token"]
-    PAWAN_KRD_TOKEN = GLOBAL_SETTINGS["pawankrd_key"]
-    COMMAND_PREFIX = GLOBAL_SETTINGS["command_prefix"]
-    if BOT_TOKEN == None or PAWAN_KRD_TOKEN == None:
-        print("Discord bot token or pawan.krd (https://discord.gg/pawan) key is missing from settings.json. Please add the missing settings.")
-        quit()
+    conversations = {}
+    name_overrides = {}
+
+    for channel in [k for k in list(GLOBAL_SETTINGS.keys()) if not k in ["bot_token","pawankrd_key","command_prefix"]]:
+        conversations[channel] = {}
+
+load_global_settings()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -112,8 +121,6 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
 
 async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings):
     if conversation.use_gpt:
-        print("use gpt")
-        #resp = gpt.complete(text,stop=["\n\n"],temperature=Conversation.temperature)
         resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. \n\n```{text}```",temperature=Conversation.temperature)
         resp = resp.removeprefix(f"{conversation.botname}: ")
     else:
@@ -151,13 +158,7 @@ def send_webhook_message(message:str,settings:ChannelSettings,conversation:Conve
                 }
     requests.post(settings.WEBHOOK,data)
     
-        
 
-conversations = {}
-name_overrides = {}
-
-for channel in [k for k in list(GLOBAL_SETTINGS.keys()) if not k in ["bot_token","pawankrd_key","command_prefix"]]:
-    conversations[channel] = {}
 
 
 @client.event
@@ -205,6 +206,12 @@ async def clear_command(ctx):
         return
     get_conversation(ctx.author.name,settings).messages = ""
     await ctx.reply("Cleared conversation!",mention_author=False)
+
+@client.command(name="reload")
+@commands.has_permissions(administrator=True)
+async def reload_command(ctx):
+    load_global_settings()
+    await ctx.reply("Reloaded!",mention_author=False)
 
 @client.command(name="debug")
 async def debug_command(ctx):

@@ -14,6 +14,7 @@ To use a command, in any channel thats configured in the settings.json, write th
 * get - Returns the current conversation. (Can often fail due to message character count limits)
 * debug - Returns all active conversations in JSON format. (Can often fail due to message character count limits)
 
+The reload command can be used by any administrator in any channel. It reloads the settings.json, to update presets and settings.
 
 # Customization
 **Note**: you can probably just use the examples at the bottom of the page if you don't want to read all the following documentation.
