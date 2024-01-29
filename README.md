@@ -9,6 +9,7 @@ The bot can also be used together with a webhook in the channel, which allows th
 To use a command, in any channel thats configured in the settings.json, write the command prefix followed by a command, of the following:
 * preset \<preset name\> - Load a preset
 * list - Sends the available presets for that channel
+* info - Sends preset info
 * clear - Clears the current conversation
 * username \<new name\> - Set the name you will appear as to the bot. Ex: username The God of Beans
 * get - Returns the current conversation. (Can often fail due to message character count limits)
@@ -51,7 +52,7 @@ Here is an example settings.json
     "bot-chat-channel-without-webhooks":
     {
         "global":false,
-        "allowed_commands":["preset","list","get","debug","clear","username"],
+        "allowed_commands":["preset","list","get","debug","clear","username","info"],
         "presets":
             {
                 "assistant":
@@ -65,7 +66,7 @@ Here is an example settings.json
     "bot-chat-channel-with-webhooks":
     {
         "global":false,
-        "allowed_commands":["preset","list","get","debug","clear","username"],
+        "allowed_commands":["preset","list","get","debug","clear","username","info"],
         "webhook":"webhook url"
         "presets":
             {
@@ -81,7 +82,7 @@ Here is an example settings.json
     "global-bot-channel":
     {
         "global":true,
-        "allowed_commands":["preset","list","get","debug","clear","username"],
+        "allowed_commands":["preset","list","get","debug","clear","username","info"],
         "presets":
             {
                 "assistant":

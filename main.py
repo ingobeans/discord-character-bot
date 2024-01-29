@@ -13,7 +13,7 @@ if not os.path.isfile("settings.json"):
     "enter channel name here (you can have multiple channels as seperate keys, all with the following format)":
     {
         "global":false,
-        "allowed_commands":["preset","list","get","debug","clear","username"],
+        "allowed_commands":["preset","list","get","debug","clear","username","info"],
         
         "DISABLED.webhook": "remove 'DISABLED.' to use a webhook url here. A webhook isn't required, but allows your presets to have custom avatars and usernames.",
 
@@ -58,6 +58,7 @@ client = commands.Bot(command_prefix=COMMAND_PREFIX, intents=intents)
 
 @dataclass
 class Conversation:
+    name:str
     start_text:str
     username:str
     botname:str
@@ -110,6 +111,7 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
         c = settings.PRESETS[list(settings.PRESETS.keys())[0]]
         gpt = "use_gpt" in c and c["use_gpt"] == True
         conversations[settings.CHANNEL_NAME][username] = Conversation(
+            list(settings.PRESETS.keys())[0],
             c["content"],
             c["username"],
             c["botname"],
@@ -124,8 +126,9 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
     return conversations[settings.CHANNEL_NAME][username]
 
 async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings,fixed_botname_override:bool=False):
+    print(f"Text to complete: {text}")
     if conversation.use_gpt:
-        resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. Your response should be of the following format: <CHARACTER NAME>: <WHAT THEY SAY>\n\n```{text}```",temperature=Conversation.temperature)
+        resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. \n\n```{text}```",temperature=Conversation.temperature)
         resp = resp.removeprefix("Next response: ")
         resp = resp.removeprefix("Possible next response: ")
         resp = resp.removeprefix(f"{conversation.botname}: ") if conversation.fixed_botname else resp
@@ -196,6 +199,7 @@ async def preset_command(ctx,presetname=None):
     new_preset = settings.PRESETS[presetname]
     
     conversation = get_conversation(ctx.author.name,settings)
+    conversation.name = presetname
     conversation.start_text = new_preset["content"]
     conversation.username = new_preset["username"]
     conversation.botname = new_preset["botname"]
@@ -215,6 +219,25 @@ async def list_command(ctx):
     if not "list" in settings.ALLOWED_COMMANDS:
         return
     await ctx.reply("## Available presets:"+"".join(["\n\n* " + p for p in settings.PRESETS]),mention_author=False)
+
+@client.command(name="info")
+async def info_command(ctx):
+    settings = get_settings(ctx.channel.name)
+    if not "info" in settings.ALLOWED_COMMANDS:
+        return
+    conversation = get_conversation(ctx.author.name,settings)
+    embed = discord.Embed(title=f"Info - {conversation.name}", color=discord.Color.purple())
+    embed.add_field(name="Start text: ", value=conversation.start_text, inline=False)
+    embed.add_field(name="Username: ", value=conversation.username, inline=False)
+    embed.add_field(name="Botname: ", value=conversation.botname, inline=False)
+    embed.add_field(name="Fixed botname: ", value="✅" if conversation.fixed_botname else "❌", inline=False)
+    embed.add_field(name="Model: ", value="GPT-3.5" if conversation.use_gpt else "PAI-001", inline=False)
+    embed.add_field(name="Temperature: ", value=str(conversation.temperature), inline=False)
+
+    if conversation.translate:
+        embed.add_field(name="Translate", value=str(conversation.translate.to_lang), inline=False)
+
+    await ctx.reply(embed=embed,mention_author=False)
 
 @client.command(name="clear")
 async def clear_command(ctx):
