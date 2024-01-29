@@ -1,6 +1,6 @@
 import discord, json, os, model, asyncio, gpt, requests
 from discord.ext import commands
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from translate import Translator
 
 if not os.path.isfile("settings.json"):
@@ -65,9 +65,11 @@ class Conversation:
     translate:Translator
     translate_english:Translator
     avatar_url:str
+    fixed_botname:bool
     temperature:float=0.7
     messages:str=""
     generating:bool=False
+    blacklisted_names:list[str] = field(default_factory=list)
 
 @dataclass
 class ChannelSettings:
@@ -115,19 +117,30 @@ def get_conversation(username:str,settings:ChannelSettings)->Conversation:
             Translator(to_lang=c["translate"]) if "translate" in c else None,
             Translator(to_lang="en",from_lang=c["translate"]) if "translate" in c else None,
             c["avatar_url"] if "avatar_url" in c else None,
-            c["temperature"] if "temperature" in c else 0.7
+            c["fixed_botname"] if "fixed_botname" in c else True,
+            c["temperature"] if "temperature" in c else 0.7,
         )
     
     return conversations[settings.CHANNEL_NAME][username]
 
-async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings):
+async def generate_response(text:str,message,conversation:Conversation,settings:ChannelSettings,fixed_botname_override:bool=False):
     if conversation.use_gpt:
-        resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. \n\n```{text}```",temperature=Conversation.temperature)
-        resp = resp.removeprefix(f"{conversation.botname}: ")
+        resp:str = gpt.get_prompt(f"Hi! Please read the dialogue and provide what you think the next response would be. Your response should be of the following format: <CHARACTER NAME>: <WHAT THEY SAY>\n\n```{text}```",temperature=Conversation.temperature)
+        resp = resp.removeprefix("Next response: ")
+        resp = resp.removeprefix("Possible next response: ")
+        resp = resp.removeprefix(f"{conversation.botname}: ") if conversation.fixed_botname else resp
     else:
         resp = model.complete(text,PAWAN_KRD_TOKEN,stop=[f"\n\n"],max_tokens=128,temperature=Conversation.temperature)
         resp = remove_partial_suffix(resp,f"\n\n{conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)}").strip() # respoonse wont stop exactly at the stop variable, as it generates in chunks. This function removes any leftovers
 
+    if not conversation.fixed_botname:
+        name = resp.split(": ",1)[0]
+        if name in conversation.blacklisted_names:
+            print(f"Tried to use blacklisted name of {name}, regenerating...")
+            conversation.messages += f"{conversation.botname}: "
+            await generate_response(f"{text}{conversation.botname}: ",message,conversation,settings,True)
+            return
+    
     conversation.messages+=f"{resp}\n\n"
 
     print(f"{message.author.name} -> {repr(resp)}")
@@ -138,14 +151,14 @@ async def generate_response(text:str,message,conversation:Conversation,settings:
     
     conversation.generating = False
     if settings.WEBHOOK != None:
-        send_webhook_message(resp,settings,conversation)
+        send_webhook_message(resp,settings,conversation,fixed_botname_override)
         return
     
     await message.reply(resp,mention_author=False)
 
-def send_webhook_message(message:str,settings:ChannelSettings,conversation:Conversation):
+def send_webhook_message(message:str,settings:ChannelSettings,conversation:Conversation,fixed_botname_override:bool=False):
     botname = conversation.botname
-    if not botname:
+    if not conversation.fixed_botname and not fixed_botname_override:
         if len(message.split(": ",1)) == 2:
             botname = message.split(": ",1)[0]
             message = message.split(": ",1)[1]
@@ -191,6 +204,8 @@ async def preset_command(ctx,presetname=None):
     conversation.translate = Translator(to_lang=new_preset["translate"]) if "translate" in new_preset else None
     conversation.translate_english = Translator(to_lang="en",from_lang=new_preset["translate"]) if "translate" in new_preset else None
     conversation.avatar_url = new_preset["avatar_url"] if "avatar_url" in new_preset else None
+    conversation.fixed_botname = new_preset["fixed_botname"] if "fixed_botname" in new_preset else True
+    conversation.blacklisted_names = []
 
     await ctx.reply(f"Loaded preset {presetname}",mention_author=False)
 
@@ -260,7 +275,6 @@ async def on_message(message):
     
     conversation = get_conversation(author,settings)
 
-    print(conversation.generating)
     if conversation.generating:
         await message.reply("Already generating a message, please wait for it to finish before sending new message.",mention_author=False)
         return
@@ -270,7 +284,9 @@ async def on_message(message):
         print(f"Translated: {content}")
 
     username = conversation.username.format(name=get_name(message.author.display_name),username=message.author.name)
-    conversation.messages+=f"{username}: {content}\n\n{conversation.botname}: " if conversation.botname else f"{username}: {content}\n\n"
+    conversation.messages+=f"{username}: {content}\n\n{conversation.botname}: " if conversation.fixed_botname else f"{username}: {content}\n\n"
+    if not conversation.fixed_botname and not username in conversation.blacklisted_names:
+        conversation.blacklisted_names.append(username)
     
     conversation.generating = True
     asyncio.create_task(generate_response(conversation.start_text+conversation.messages,message,conversation,settings))
