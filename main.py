@@ -222,7 +222,7 @@ async def list_command(ctx):
 
 @client.command(name="info")
 async def info_command(ctx):
-    settings = get_settings(ctx.channel.name)
+    settings = get_settings("dm" if isinstance(ctx.channel, discord.channel.DMChannel) else ctx.channel.name)
     if not "info" in settings.ALLOWED_COMMANDS:
         return
     conversation = get_conversation(ctx.author.name,settings)
@@ -241,7 +241,7 @@ async def info_command(ctx):
 
 @client.command(name="clear")
 async def clear_command(ctx):
-    settings = get_settings(ctx.channel.name)
+    settings = get_settings("dm" if isinstance(ctx.channel, discord.channel.DMChannel) else ctx.channel.name)
     if not "clear" in settings.ALLOWED_COMMANDS:
         return
     get_conversation(ctx.author.name,settings).messages = ""
@@ -255,14 +255,14 @@ async def reload_command(ctx):
 
 @client.command(name="debug")
 async def debug_command(ctx):
-    settings = get_settings(ctx.channel.name)
+    settings = get_settings("dm" if isinstance(ctx.channel, discord.channel.DMChannel) else ctx.channel.name)
     if not "debug" in settings.ALLOWED_COMMANDS:
         return
     await ctx.reply(f"```json\n{str(conversations)}```",mention_author=False)
 
 @client.command(name="get")
 async def get_command(ctx):
-    settings = get_settings(ctx.channel.name)
+    settings = get_settings("dm" if isinstance(ctx.channel, discord.channel.DMChannel) else ctx.channel.name)
     if not "get" in settings.ALLOWED_COMMANDS:
         return
     conversation = get_conversation(ctx.author.name,settings)
@@ -271,7 +271,7 @@ async def get_command(ctx):
 @client.command(name="username")
 async def username_command(ctx, *, username=None):
     global name_overrides
-    settings = get_settings(ctx.channel.name)
+    settings = get_settings("dm" if isinstance(ctx.channel, discord.channel.DMChannel) else ctx.channel.name)
     if not "username" in settings.ALLOWED_COMMANDS:
         return
     
@@ -285,13 +285,16 @@ async def username_command(ctx, *, username=None):
 @client.event
 async def on_message(message):
     global conversations
-    if not message.channel.name in GLOBAL_SETTINGS or message.author.bot:
+    channel_name = "dm" if isinstance(message.channel, discord.channel.DMChannel) else message.channel.name
+    
+    if not channel_name in GLOBAL_SETTINGS or message.author.bot:
         return
+    
     if message.content.startswith(COMMAND_PREFIX):
         await client.process_commands(message)
         return
     
-    settings = get_settings(message.channel.name)
+    settings = get_settings(channel_name)
 
     author = message.author.name
     content = message.content

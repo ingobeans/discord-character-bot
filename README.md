@@ -31,7 +31,7 @@ Next up, to add channels the bot will interact in, add the channel names as keys
 * "global" - Boolean, whether all users should share a single conversation, or if all users should have their own conversation. **Important: before using, read the Presets paragraph (specifically under username)**
 * "allowed_commands" - List of Strings, names of commands to be allowed
 * (optional) "webhook" - String, webhook URL
-* "presets" - Object containing presets. The keys of the object are preset names, the value is a preset object
+* "presets" - Object containing presets. The keys of the object are preset names, the value is a preset object. If the key is "dm", it will be the settings for DMs (webhooks won't work in DMs).
 
 ### Presets
 Presets are objects containing the keys:
@@ -78,6 +78,17 @@ Here is an example settings.json
                     "avatar_url":"https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/800px-ChatGPT_logo.svg.png"
                 }
             }
+    },
+    "dm": {
+        "allowed_commands":["get","debug","clear","username","info"],
+        "presets": {
+            "assistant":
+                {
+                    "content":"Conversation between an AI assistant and user.\n\n",
+                    "username":"{user}",
+                    "botname":"Assistant",
+                }
+        }
     },
     "global-bot-channel":
     {
